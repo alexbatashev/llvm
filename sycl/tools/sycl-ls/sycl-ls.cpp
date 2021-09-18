@@ -65,7 +65,7 @@ static void printDeviceInfo(const device &Device, const std::string &Prepend) {
   auto DeviceDriverVersion = Device.get_info<info::device::driver_version>();
 
   if (verbose) {
-    std::cout << Prepend << "Type       : " << DeviceTypeName << std::endl;
+    std::cout << Prepend << "Type ~~~      : " << DeviceTypeName << std::endl;
     std::cout << Prepend << "Version    : " << DeviceVersion << std::endl;
     std::cout << Prepend << "Name       : " << DeviceName << std::endl;
     std::cout << Prepend << "Vendor     : " << DeviceVendor << std::endl;
