@@ -298,6 +298,7 @@ public:
   DeviceBinaryImage() : Bin(nullptr){};
 
   virtual void print() const;
+  virtual std::string describe() const;
   virtual void dump(std::ostream &Out) const;
 
   size_t getSize() const {

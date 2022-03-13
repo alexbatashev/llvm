@@ -17,6 +17,14 @@ __SYCL_INLINE_NAMESPACE(cl) {
 namespace sycl {
 namespace detail {
 #ifdef XPTI_ENABLE_INSTRUMENTATION
+
+uint8_t GDebugStreamID;
+xpti::trace_event_data_t *GLogEvent;
+uint16_t LogTracePointT;
+uint16_t LogInfoT;
+uint16_t LogWarnT;
+uint16_t LogErrorT;
+
 xpti::trace_event_data_t *XPTIRegistry::createTraceEvent(
     const void *Obj, const void *FuncPtr, uint64_t &IId,
     const detail::code_location &CodeLoc, uint16_t TraceEventType) {
@@ -27,11 +35,14 @@ xpti::trace_event_data_t *XPTIRegistry::createTraceEvent(
                           (CodeLoc.fileName() ? CodeLoc.fileName() : ""),
                           CodeLoc.lineNumber(), CodeLoc.columnNumber(), Obj);
 
+  xpti::framework::tracepoint_t TP{&Payload};
+
   // Calls could be at different user-code locations; We create a new event
   // based on the code location info and if this has been seen before, a
   // previously created event will be returned.
-  return xptiMakeEvent(Name.c_str(), &Payload, TraceEventType, xpti_at::active,
-                       &IId);
+  return xptiMakeEvent(Name.c_str(),
+                       const_cast<xpti::payload_t *>(TP.payload()),
+                       TraceEventType, xpti_at::active, &IId);
 }
 #endif // XPTI_ENABLE_INSTRUMENTATION
 
@@ -133,6 +144,35 @@ void XPTIRegistry::bufferAccessorNotification(
       UserObj, "accessor", IId, CodeLoc, xpti::trace_offload_accessor_event);
   xptiNotifySubscribers(GBufferStreamID, xpti::trace_offload_alloc_accessor,
                         nullptr, TraceEvent, IId, &AccessorConstr);
+#endif
+}
+
+void XPTIRegistry::logImpl(const char *Message, uint16_t LogLevel,
+                           XPTILogDomain Domain) {
+#ifdef XPTI_ENABLE_INSTRUMENTATION
+  if (!xptiTraceEnabled())
+    return;
+
+  uint64_t IId;
+  xpti::trace_event_data_t *Event =
+      createTraceEvent(nullptr, "log", IId, detail::code_location(), LogLevel);
+  xpti::addMetadata(Event, "domain", static_cast<uint32_t>(Domain));
+  switch (Domain) {
+  case XPTILogDomain::Unknown:
+    xpti::addMetadata<const char *>(Event, "domain_name", "Unknown");
+    break;
+  case XPTILogDomain::ProgramManager:
+    xpti::addMetadata<const char *>(Event, "domain_name", "Program Manager");
+    break;
+  case XPTILogDomain::Scheduler:
+    xpti::addMetadata<const char *>(Event, "domain_name", "Scheduler");
+    break;
+  case XPTILogDomain::Device:
+    xpti::addMetadata<const char *>(Event, "domain_name", "Device");
+    break;
+  }
+  xptiNotifySubscribers(GDebugStreamID, LogTracePointT, nullptr, Event, IId,
+                        Message);
 #endif
 }
 

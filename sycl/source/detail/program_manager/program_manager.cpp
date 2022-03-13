@@ -24,6 +24,7 @@
 #include <detail/program_impl.hpp>
 #include <detail/program_manager/program_manager.hpp>
 #include <detail/spec_constant_impl.hpp>
+#include <detail/xpti_registry.hpp>
 #include <sycl/ext/oneapi/experimental/spec_constant.hpp>
 
 #include <algorithm>
@@ -112,6 +113,13 @@ ProgramManager::getDeviceImage(OSModuleHandle M, const std::string &KernelName,
               << KernelName << "\", " << getRawSyclObjImpl(Context) << ", "
               << getRawSyclObjImpl(Device) << ", " << JITCompilationIsRequired
               << ")\n";
+
+  XPTIRegistry::info(
+      XPTILogDomain::ProgramManager,
+      "getDeviceImage(OSModuleHandle = {}, KernelName = {}, Context = {}, "
+      "Device = {} ({}), JITIsRequired = {})",
+      M, KernelName, getRawSyclObjImpl(Context), getRawSyclObjImpl(Device),
+      getSyclObjImpl(Device)->getDeviceName(), JITCompilationIsRequired);
 
   KernelSetId KSId = getKernelSetId(M, KernelName);
   return getDeviceImage(M, KSId, Context, Device, JITCompilationIsRequired);
@@ -310,6 +318,11 @@ RT::PiProgram ProgramManager::createPIProgram(const RTDeviceBinaryImage &Img,
     std::cerr << ">>> ProgramManager::createPIProgram(" << &Img << ", "
               << getRawSyclObjImpl(Context) << ", " << getRawSyclObjImpl(Device)
               << ")\n";
+  XPTIRegistry::info(
+      XPTILogDomain::ProgramManager,
+      "createPIProgram(DeviceImage = {}, Context = {}, Device = {} ({}))", &Img,
+      getRawSyclObjImpl(Context), getRawSyclObjImpl(Device),
+      getSyclObjImpl(Device)->getDeviceName());
   const pi_device_binary_struct &RawImg = Img.getRawData();
 
   // perform minimal sanity checks on the device image and the descriptor
@@ -362,6 +375,9 @@ RT::PiProgram ProgramManager::createPIProgram(const RTDeviceBinaryImage &Img,
   if (DbgProgMgr > 1)
     std::cerr << "created program: " << Res
               << "; image format: " << getFormatStr(Format) << "\n";
+  XPTIRegistry::info(XPTILogDomain::ProgramManager,
+                     "created program: {}; image format: {}", Res,
+                     getFormatStr(Format));
 
   return Res;
 }
@@ -466,6 +482,13 @@ static void emitBuiltProgramInfo(const pi_program &Prog,
         ProgramManager::getProgramBuildLog(Prog, Context);
     std::clog << ProgramBuildLog << std::endl;
   }
+#ifdef XPTI_ENABLE_INSTRUMENTATION
+  if (xptiTraceEnabled()) {
+    std::string ProgramBuildLog =
+        ProgramManager::getProgramBuildLog(Prog, Context);
+    XPTIRegistry::info(ProgramBuildLog);
+  }
+#endif
 }
 
 RT::PiProgram ProgramManager::getBuiltPIProgram(
@@ -597,6 +620,11 @@ ProgramManager::getOrCreateKernel(OSModuleHandle M,
               << ContextImpl.get() << ", " << DeviceImpl.get() << ", "
               << KernelName << ")\n";
   }
+  XPTIRegistry::info(XPTILogDomain::ProgramManager,
+                     "getOrCreateKernel(OSModuleHandle = {}, Context = {}, "
+                     "Device = {} ({}), KernelName = {})",
+                     M, ContextImpl.get(), DeviceImpl.get(),
+                     DeviceImpl->getDeviceName(), KernelName);
 
   using PiKernelT = KernelProgramCache::PiKernelT;
   using KernelCacheT = KernelProgramCache::KernelCacheT;
@@ -863,6 +891,24 @@ ProgramManager::getDeviceImage(OSModuleHandle M, KernelSetId KSId,
     std::cerr << "available device images:\n";
     debugPrintBinaryImages();
   }
+  XPTIRegistry::info(
+      XPTILogDomain::ProgramManager,
+      "getDeviceImage(OSModuleHandle = {}, KernelSetId = {}, Context = {}, "
+      "Device = {} ({}), JITCompilationIsRequired = {}",
+      M, KSId, getRawSyclObjImpl(Context), getRawSyclObjImpl(Device),
+      getSyclObjImpl(Device)->getDeviceName(), JITCompilationIsRequired);
+#ifdef XPTI_ENABLE_INSTRUMENTATION
+  if (xptiTraceEnabled()) {
+    for (const auto &ImgVecIt : m_DeviceImages) {
+      XPTIRegistry::info(XPTILogDomain::ProgramManager, "  Kernel set: {}",
+                         ImgVecIt.first);
+      for (const auto &Img : *ImgVecIt.second) {
+        XPTIRegistry::info(XPTILogDomain::ProgramManager, "DeviceImage:\n{}",
+                           Img->describe());
+      }
+    }
+  }
+#endif
   std::lock_guard<std::mutex> Guard(Sync::getGlobalLock());
   std::vector<RTDeviceBinaryImageUPtr> &Imgs = *m_DeviceImages[KSId];
   const ContextImplPtr Ctx = getSyclObjImpl(Context);
@@ -903,6 +949,13 @@ ProgramManager::getDeviceImage(OSModuleHandle M, KernelSetId KSId,
     std::cerr << "selected device image: " << &Img->getRawData() << "\n";
     Img->print();
   }
+#ifdef XPTI_ENABLE_INSTRUMENTATION
+  if (xptiTraceEnabled()) {
+    XPTIRegistry::info(XPTILogDomain::ProgramManager,
+                       "selected device image: {}", &Img->getRawData());
+    XPTIRegistry::info("{}", Img->describe());
+  }
+#endif
 
   if (std::getenv("SYCL_DUMP_IMAGES") && !m_UseSpvFile)
     dumpImage(*Img, KSId);
@@ -989,6 +1042,11 @@ ProgramManager::ProgramPtr ProgramManager::build(
               << CompileOptions << ", " << LinkOptions << ", ... " << Device
               << ")\n";
   }
+
+  XPTIRegistry::info(
+      XPTILogDomain::ProgramManager,
+      "build(Program = {}, CompileOptions = {}, LinkOptions = {}, Device = {})",
+      Program.get(), CompileOptions, LinkOptions, Device);
 
   bool LinkDeviceLibs = (DeviceLibReqMask != 0);
 

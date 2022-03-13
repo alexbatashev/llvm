@@ -687,6 +687,8 @@ constexpr uint16_t trace_offload_alloc_release =
 constexpr uint16_t trace_offload_alloc_accessor =
     static_cast<uint16_t>(xpti::trace_point_type_t::offload_alloc_accessor);
 
+constexpr uint16_t trace_unknown_event =
+    static_cast<uint16_t>(xpti::trace_event_type_t::unknown_event);
 constexpr uint16_t trace_graph_event =
     static_cast<uint16_t>(xpti::trace_event_type_t::graph);
 constexpr uint16_t trace_algorithm_event =

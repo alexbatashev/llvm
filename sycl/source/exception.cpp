@@ -9,6 +9,7 @@
 // 4.9.2 Exception Class Interface
 #include <CL/sycl/context.hpp>
 #include <CL/sycl/exception.hpp>
+#include <detail/xpti_registry.hpp>
 
 #include <cstring>
 
@@ -76,6 +77,7 @@ exception::exception(std::error_code EC, std::shared_ptr<context> SharedPtrCtx,
   // insert error code
   std::error_code *ECPtr = reinterpret_cast<std::error_code *>(ReservedPtr);
   memcpy(ECPtr, &EC, sizeof(std::error_code));
+  detail::XPTIRegistry::error(WhatArg);
 }
 
 const std::error_code &exception::code() const noexcept {

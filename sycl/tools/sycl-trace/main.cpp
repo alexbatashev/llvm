@@ -9,6 +9,7 @@
 #include "launch.hpp"
 #include "llvm/Support/CommandLine.h"
 
+#include <bitset>
 #include <iostream>
 #include <string>
 
@@ -16,6 +17,15 @@ using namespace llvm;
 
 enum ModeKind { PI, ZE, CU };
 enum PrintFormatKind { PRETTY_COMPACT, PRETTY_VERBOSE, CLASSIC };
+
+enum LogDomainKinds {
+  LOG_UNKNOWN = 0,
+  LOG_PROGRAM_MANAGER = 1,
+  LOG_SCHEDULER = 2,
+  LOG_DEVICE = 3
+};
+
+enum LogLevelKinds { LOG_ERR, LOG_WARN, LOG_INFO, LOG_NONE };
 
 int main(int argc, char **argv, char *env[]) {
   cl::list<ModeKind> Modes(
@@ -33,6 +43,20 @@ int main(int argc, char **argv, char *env[]) {
           clEnumValN(
               CLASSIC, "classic",
               "Similar to SYCL_PI_TRACE, only compatible with PI layer")));
+  cl::bits<LogDomainKinds> LogDomains(
+      cl::desc("Available log domains:"),
+      cl::values(
+          clEnumValN(LOG_UNKNOWN, "log-unknown", "Unknown log source"),
+          clEnumValN(LOG_PROGRAM_MANAGER, "log-prog-manager",
+                     "Logs from Program Manager"),
+          clEnumValN(LOG_SCHEDULER, "log-sched", "Logs from scheduler"),
+          clEnumValN(LOG_DEVICE, "log-device", "Logs related to devices")));
+  cl::opt<LogLevelKinds> LogLevel(
+      "log-level", cl::desc("Log verbosity level"),
+      cl::values(clEnumValN(LOG_ERR, "err", "Critical errors only"),
+                 clEnumValN(LOG_WARN, "warn", "Warnings"),
+                 clEnumValN(LOG_INFO, "info", "Debug info from SYCL runtime"),
+                 clEnumValN(LOG_NONE, "none", "Do not print logs")));
   cl::opt<std::string> TargetExecutable(
       cl::Positional, cl::desc("<target executable>"), cl::Required);
   cl::list<std::string> Argv(cl::ConsumeAfter,
@@ -86,6 +110,20 @@ int main(int argc, char **argv, char *env[]) {
   } else {
     NewEnv.push_back("SYCL_TRACE_PRINT_FORMAT=compact");
   }
+
+  if (LogLevel == LOG_ERR) {
+    NewEnv.push_back("SYCL_TRACE_LOG_LEVEL=err");
+  } else if (LogLevel == LOG_WARN) {
+    NewEnv.push_back("SYCL_TRACE_LOG_LEVEL=warn");
+  } else if (LogLevel == LOG_INFO) {
+    NewEnv.push_back("SYCL_TRACE_LOG_LEVEL=info");
+  } else if (LogLevel == LOG_NONE) {
+    NewEnv.push_back("SYCL_TRACE_LOG_LEVEL=none");
+  }
+
+  std::bitset<4> LogMask{LogDomains.getBits() == 0 ? 0b1111
+                                                   : LogDomains.getBits()};
+  NewEnv.push_back("SYCL_TRACE_LOG_MASK=" + LogMask.to_string());
 
   if (Modes.size() == 0) {
     EnablePITrace();

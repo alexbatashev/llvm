@@ -376,6 +376,7 @@ std::vector<plugin> &initialize() {
   // std::call_once is blocking all other threads if a thread is already
   // creating a vector of plugins. So, no additional lock is needed.
   std::call_once(PluginsInitDone, [&]() {
+    GlobalHandler::instance().getXPTIRegistry().initializeFrameworkOnce();
     initializePlugins(GlobalHandler::instance().getPlugins());
   });
   return GlobalHandler::instance().getPlugins();
@@ -396,6 +397,7 @@ static void initializePlugins(std::vector<plugin> &Plugins) {
     void *Library = loadPlugin(PluginNames[I].first);
 
     if (!Library) {
+      XPTIRegistry::error("Failed to load plugin: {}", PluginNames[I].first);
       if (trace(PI_TRACE_ALL)) {
         std::cerr << "SYCL_PI_TRACE[all]: "
                   << "Check if plugin is present. "
@@ -406,6 +408,8 @@ static void initializePlugins(std::vector<plugin> &Plugins) {
     }
 
     if (!bindPlugin(Library, PluginInformation)) {
+      XPTIRegistry::error("Failed to bind PI APIs to the plugin: {}",
+                          PluginNames[I].first);
       if (trace(PI_TRACE_ALL)) {
         std::cerr << "SYCL_PI_TRACE[all]: "
                   << "Failed to bind PI APIs to the plugin: "
@@ -448,6 +452,8 @@ static void initializePlugins(std::vector<plugin> &Plugins) {
     }
     Plugins.emplace_back(
         plugin(PluginInformation, PluginNames[I].second, Library));
+    XPTIRegistry::info("Plugin found and successfully loaded: {}",
+                       PluginNames[I].first);
     if (trace(TraceLevel::PI_TRACE_BASIC))
       std::cerr << "SYCL_PI_TRACE[basic]: "
                 << "Plugin found and successfully loaded: "
@@ -617,6 +623,43 @@ void DeviceBinaryImage::print() const {
       std::cerr << "        " << DeviceBinaryProperty(P) << "\n";
     }
   }
+}
+
+std::string DeviceBinaryImage::describe() const {
+  std::stringstream Stream;
+  Stream << "  --- Image " << Bin << "\n";
+  if (!Bin)
+    return "";
+  Stream << "    Version  : " << (int)Bin->Version << "\n";
+  Stream << "    Kind     : " << (int)Bin->Kind << "\n";
+  Stream << "    Format   : " << (int)Bin->Format << "\n";
+  Stream << "    Target   : " << Bin->DeviceTargetSpec << "\n";
+  Stream << "    Bin size : "
+         << ((intptr_t)Bin->BinaryEnd - (intptr_t)Bin->BinaryStart) << "\n";
+  Stream << "    Compile options : "
+         << (Bin->CompileOptions ? Bin->CompileOptions : "NULL") << "\n";
+  Stream << "    Link options    : "
+         << (Bin->LinkOptions ? Bin->LinkOptions : "NULL") << "\n";
+  Stream << "    Entries  : ";
+  for (_pi_offload_entry EntriesIt = Bin->EntriesBegin;
+       EntriesIt != Bin->EntriesEnd; ++EntriesIt)
+    Stream << EntriesIt->name << " ";
+  Stream << "\n";
+  Stream << "    Properties [" << Bin->PropertySetsBegin << "-"
+         << Bin->PropertySetsEnd << "]:\n";
+
+  for (pi_device_binary_property_set PS = Bin->PropertySetsBegin;
+       PS != Bin->PropertySetsEnd; ++PS) {
+    Stream << "      Category " << PS->Name << " [" << PS->PropertiesBegin
+           << "-" << PS->PropertiesEnd << "]:\n";
+
+    for (pi_device_binary_property P = PS->PropertiesBegin;
+         P != PS->PropertiesEnd; ++P) {
+      Stream << "        " << DeviceBinaryProperty(P) << "\n";
+    }
+  }
+
+  return Stream.str();
 }
 
 void DeviceBinaryImage::dump(std::ostream &Out) const {

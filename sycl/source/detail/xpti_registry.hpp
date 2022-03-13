@@ -9,6 +9,7 @@
 #pragma once
 
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <unordered_set>
 
@@ -18,6 +19,7 @@
 // Include the headers necessary for emitting
 // traces using the trace framework
 #include "xpti/xpti_trace_framework.h"
+#include "xpti/xpti_trace_framework.hpp"
 #endif
 
 __SYCL_INLINE_NAMESPACE(cl) {
@@ -33,12 +35,40 @@ inline constexpr const char *SYCL_PICALL_STREAM_NAME = "sycl.pi";
 inline constexpr const char *SYCL_PIDEBUGCALL_STREAM_NAME = "sycl.pi.debug";
 inline constexpr auto SYCL_MEM_ALLOC_STREAM_NAME =
     "sycl.experimental.mem_alloc";
+// Contains useful debug information from SYCL runtime
+inline constexpr const char *SYCL_DEBUG_STREAM_NAME = "sycl.debug";
 
 #ifdef XPTI_ENABLE_INSTRUMENTATION
 extern uint8_t GBufferStreamID;
 extern uint8_t GMemAllocStreamID;
+extern uint8_t GDebugStreamID;
+extern uint16_t LogTracePointT;
 extern xpti::trace_event_data_t *GMemAllocEvent;
+extern xpti::trace_event_data_t *GLogEvent;
+
+extern uint16_t LogTracePointT;
+extern uint16_t LogInfoT;
+extern uint16_t LogWarnT;
+extern uint16_t LogErrorT;
 #endif
+
+enum class XPTIEventsExtension {
+  LogError = XPTI_EVENT(0),
+  LogWarn = XPTI_EVENT(1),
+  LogInfo = XPTI_EVENT(2)
+};
+
+enum class XPTITracePointsExtension {
+  // Trace point for log events
+  Log = XPTI_TRACE_POINT_BEGIN(0),
+};
+
+enum class XPTILogDomain : uint16_t {
+  Unknown = 0,
+  ProgramManager = 1,
+  Scheduler = 2,
+  Device = 3
+};
 
 // Stream name being used to notify about buffer objects.
 inline constexpr const char *SYCL_BUFFER_STREAM_NAME =
@@ -62,6 +92,24 @@ public:
       GMemAllocEvent = xptiMakeEvent("SYCL Memory Allocations", &MAPayload,
                                      xpti::trace_algorithm_event,
                                      xpti_at::active, &MAInstanceNo);
+
+      // SYCL Debug events
+      GDebugStreamID = xptiRegisterStream(SYCL_DEBUG_STREAM_NAME);
+      this->initializeStream(SYCL_DEBUG_STREAM_NAME, 0, 1, "0.1");
+      xpti::payload_t LogPayload("SYCL Debug Layer");
+      uint64_t LogInstanceNo = 0;
+      GLogEvent =
+          xptiMakeEvent("SYCL Log", &LogPayload, xpti::trace_unknown_event,
+                        xpti_at::unknown_activity, &LogInstanceNo);
+
+      LogTracePointT = xptiRegisterUserDefinedTracePoint(
+          "sycl_dpcpp", static_cast<uint8_t>(XPTITracePointsExtension::Log));
+      LogInfoT = xptiRegisterUserDefinedEventType(
+          "sycl_dpcpp", static_cast<uint8_t>(XPTIEventsExtension::LogInfo));
+      LogWarnT = xptiRegisterUserDefinedEventType(
+          "sycl_dpcpp", static_cast<uint8_t>(XPTIEventsExtension::LogWarn));
+      LogErrorT = xptiRegisterUserDefinedEventType(
+          "sycl_dpcpp", static_cast<uint8_t>(XPTIEventsExtension::LogError));
     });
 #endif
   }
@@ -100,7 +148,96 @@ public:
                                          uint32_t,
                                          const detail::code_location &);
 
+  template <typename... ArgsT>
+  static void info(std::string_view Format, const ArgsT &...Args) {
+    log(XPTILogDomain::Unknown, LogInfoT, Format, Args...);
+  }
+
+  template <typename... ArgsT>
+  static void warn(std::string_view Format, const ArgsT &...Args) {
+    log(XPTILogDomain::Unknown, LogWarnT, Format, Args...);
+  }
+
+  template <typename... ArgsT>
+  static void error(std::string_view Format, const ArgsT &...Args) {
+    log(XPTILogDomain::Unknown, LogErrorT, Format, Args...);
+  }
+
+  template <typename... ArgsT>
+  static void info(XPTILogDomain Domain, std::string_view Format,
+                   const ArgsT &...Args) {
+    log(Domain, LogInfoT, Format, Args...);
+  }
+
+  template <typename... ArgsT>
+  static void warn(XPTILogDomain Domain, std::string_view Format,
+                   const ArgsT &...Args) {
+    log(Domain, LogWarnT, Format, Args...);
+  }
+
+  template <typename... ArgsT>
+  static void error(XPTILogDomain Domain, std::string_view Format,
+                    const ArgsT &...Args) {
+    log(Domain, LogErrorT, Format, Args...);
+  }
+
 private:
+  template <typename... ArgsT> struct formatHelper;
+
+  template <typename ArgT, typename... RestT>
+  struct formatHelper<ArgT, RestT...> {
+    static void format(std::stringstream &Stream, size_t LastPos,
+                       std::string_view Format, const ArgT &Arg,
+                       const RestT &...Rest) {
+      size_t Pos = Format.find("{}", LastPos);
+      Stream << Format.substr(LastPos, Pos != std::string::npos
+                                           ? Pos - LastPos
+                                           : std::string::npos);
+      Stream << Arg;
+
+      if (Pos != std::string::npos)
+        formatHelper<RestT...>::format(Stream, Pos + 2, Format, Rest...);
+    }
+  };
+
+  template <typename ArgT> struct formatHelper<ArgT> {
+    static void format(std::stringstream &Stream, size_t LastPos,
+                       std::string_view Format, const ArgT &Arg) {
+      size_t Pos = Format.find("{}", LastPos);
+      Stream << Format.substr(LastPos, Pos != std::string::npos
+                                           ? Pos - LastPos
+                                           : std::string::npos);
+      Stream << Arg;
+
+      if (Pos != std::string::npos)
+        formatHelper<>::format(Stream, Pos + 2, Format);
+    }
+  };
+
+  template <> struct formatHelper<> {
+    static void format(std::stringstream &Stream, size_t LastPos,
+                       std::string_view Format) {
+      Stream << Format.substr(LastPos);
+    }
+  };
+
+  template <typename... ArgsT>
+  static void log(XPTILogDomain Domain, uint16_t LogLevel,
+                  std::string_view Format, const ArgsT &...Args) {
+#ifdef XPTI_ENABLE_INSTRUMENTATION
+    if (!xptiTraceEnabled())
+      return;
+
+    std::stringstream Stream;
+    formatHelper<ArgsT...>::format(Stream, 0, Format, Args...);
+    std::string Msg = Stream.str();
+
+    logImpl(Msg.c_str(), LogLevel, Domain);
+#endif
+  }
+
+  static void logImpl(const char *, uint16_t LogLevel, XPTILogDomain Domain);
+
   std::unordered_set<std::string> MActiveStreams;
   std::once_flag MInitialized;
 

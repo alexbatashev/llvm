@@ -17,6 +17,7 @@
 #include <detail/filter_selector_impl.hpp>
 #include <detail/force_device.hpp>
 #include <detail/global_handler.hpp>
+#include <detail/xpti_registry.hpp>
 #include <sycl/ext/oneapi/filter_selector.hpp>
 // 4.6.1 Device selection class
 
@@ -57,6 +58,17 @@ device device_selector::select_device() const {
                 << "SYCL_PI_TRACE[all]: "
                 << "  device: " << DeviceName << std::endl;
     }
+#ifdef XPTI_ENABLE_INSTRUMENTATION
+    if (xptiTraceEnabled()) {
+      std::string PlatformName = dev.get_info<info::device::platform>()
+                                     .get_info<info::platform::name>();
+      std::string DeviceName = dev.get_info<info::device::name>();
+      detail::XPTIRegistry::info(
+          "select_device(): -> score = {} {}\n  platform: {}\n  device: {}",
+          dev_score, dev_score < 0 ? "(REJECTED)" : "", PlatformName,
+          DeviceName);
+    }
+#endif
 
     // A negative score means that a device must not be selected.
     if (dev_score < 0)

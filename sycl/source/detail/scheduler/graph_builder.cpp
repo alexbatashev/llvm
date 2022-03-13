@@ -14,6 +14,7 @@
 #include <detail/event_impl.hpp>
 #include <detail/queue_impl.hpp>
 #include <detail/scheduler/scheduler.hpp>
+#include <detail/xpti_registry.hpp>
 
 #include <cstdlib>
 #include <cstring>
@@ -201,6 +202,10 @@ MemObjRecord *Scheduler::GraphBuilder::getOrInsertMemObjRecord(
           ToCleanUp.push_back(Dependency);
         for (Command *Cmd : ToCleanUp)
           cleanupCommand(Cmd);
+        XPTIRegistry::info(
+            XPTILogDomain::Scheduler,
+            "getOrInsertMemObjRecord(...) cleaned up {} commands",
+            ToCleanUp.size());
       };
 
   const ContextImplPtr &InteropCtxPtr = Req->MSYCLMemObj->getInteropContext();
@@ -287,6 +292,9 @@ UpdateHostRequirementCommand *Scheduler::GraphBuilder::insertUpdateHostReqCmd(
   addNodeToLeaves(Record, UpdateCommand, Req->MAccessMode, ToEnqueue);
   for (Command *Cmd : ToCleanUp)
     cleanupCommand(Cmd);
+  XPTIRegistry::info(XPTILogDomain::Scheduler,
+                     "insertUpdateHostReqCmd(...) cleaned up {} commands",
+                     ToCleanUp.size());
   return UpdateCommand;
 }
 
@@ -402,6 +410,9 @@ Command *Scheduler::GraphBuilder::insertMemoryMove(
   addNodeToLeaves(Record, NewCmd, access::mode::read_write, ToEnqueue);
   for (Command *Cmd : ToCleanUp)
     cleanupCommand(Cmd);
+  XPTIRegistry::info(XPTILogDomain::Scheduler,
+                     "insertMemoryMove(...) cleaned up {} commands",
+                     ToCleanUp.size());
   Record->MCurContext = Queue->getContextImplPtr();
   return NewCmd;
 }
@@ -447,6 +458,9 @@ Command *Scheduler::GraphBuilder::remapMemoryObject(
   addNodeToLeaves(Record, MapCmd, access::mode::read_write, ToEnqueue);
   for (Command *Cmd : ToCleanUp)
     cleanupCommand(Cmd);
+  XPTIRegistry::info(XPTILogDomain::Scheduler,
+                     "remapMemoryObject(...) cleaned up {} commands",
+                     ToCleanUp.size());
   Record->MHostAccess = MapMode;
   return MapCmd;
 }
@@ -492,6 +506,9 @@ Scheduler::GraphBuilder::addCopyBack(Requirement *Req,
   addNodeToLeaves(Record, MemCpyCmd, Req->MAccessMode, ToEnqueue);
   for (Command *Cmd : ToCleanUp)
     cleanupCommand(Cmd);
+  XPTIRegistry::info(XPTILogDomain::Scheduler,
+                     "addCopyBack(...) cleaned up {} commands",
+                     ToCleanUp.size());
   if (MPrintOptionsArray[AfterAddCopyBack])
     printGraphAsDot("after_addCopyBack");
   return MemCpyCmd;
@@ -815,6 +832,9 @@ AllocaCommandBase *Scheduler::GraphBuilder::getOrCreateAllocaForReq(
     ++(AllocaCmd->MLeafCounter);
     for (Command *Cmd : ToCleanUp)
       cleanupCommand(Cmd);
+    XPTIRegistry::info(XPTILogDomain::Scheduler,
+                       "getOrCreateAllocaForReq(...) cleaned up {} commands",
+                       ToCleanUp.size());
   }
   return AllocaCmd;
 }
@@ -877,6 +897,9 @@ Scheduler::GraphBuilder::addEmptyCmd(Command *Cmd, const std::vector<T *> &Reqs,
     }
     for (Command *Cmd : ToCleanUp)
       cleanupCommand(Cmd);
+    XPTIRegistry::info(XPTILogDomain::Scheduler,
+                       "addEmptyCmd(...) cleaned up {} commands",
+                       ToCleanUp.size());
   }
 
   return EmptyCmd;
@@ -1024,6 +1047,8 @@ Scheduler::GraphBuilder::addCG(std::unique_ptr<detail::CG> CommandGroup,
 
   for (Command *Cmd : ToCleanUp)
     cleanupCommand(Cmd);
+  XPTIRegistry::info(XPTILogDomain::Scheduler,
+                     "addCG(...) cleaned up {} commands", ToCleanUp.size());
   return NewCmd.release();
 }
 
