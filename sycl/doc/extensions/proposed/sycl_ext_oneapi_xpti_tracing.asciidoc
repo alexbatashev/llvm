@@ -1,0 +1,166 @@
+= sycl_ext_oneapi_xpti_tracing
+
+:source-highlighter: coderay
+:coderay-linenums-mode: table
+
+// This section needs to be after the document title.
+:doctype: book
+:toc2:
+:toc: left
+:encoding: utf-8
+:lang: en
+:dpcpp: pass:[DPC++]
+
+// Set the default source code type in this document to C++,
+// for syntax highlighting purposes.  This is needed because
+// docbook uses c++ and html5 uses cpp.
+:language: {basebackend@docbook:c++:cpp}
+
+
+== Notice
+
+[%hardbreaks]
+Copyright (C) 2022-2022 Intel Corporation.  All rights reserved.
+
+Khronos(R) is a registered trademark and SYCL(TM) and SPIR(TM) are trademarks
+of The Khronos Group Inc.  OpenCL(TM) is a trademark of Apple Inc. used by
+permission by Khronos.
+
+
+== Contact
+
+To report problems with this extension, please open a new issue at:
+
+https://github.com/intel/llvm/issues
+
+
+== Dependencies
+
+This extension is written against the SYCL 2020 revision 4 specification.  All
+references below to the "core SYCL specification" or to section numbers in the
+SYCL specification refer to that revision.
+
+_If your extension depends on other SYCL extensions, add a paragraph and
+bulleted list like this:_
+
+This extension also depends on the following external projects:
+
+* link:../../../../xpti/doc/SYCL_Tracing_Implementation.md[XPTI]
+
+
+== Status
+
+This is a proposed extension specification, intended to gather community
+feedback.  Interfaces defined in this specification may not be implemented yet
+or may be in a preliminary state.  The specification itself may also change in
+incompatible ways before it is finalized.  *Shipping software products should
+not rely on APIs defined in this specification.*
+
+
+== Overview
+
+XPTI is a lightweight tracing framework designed to facilitate explicit
+instrumentation of application for performance and debug tracing. This extension
+describes instrumentation trace points added to SYCL runtime. External tools can
+use information provided in XPTI notifications to inspect the behavior of a
+running SYCL application. More information on XPTI architecture and usage
+examples can be found in the
+https://github.com/intel/llvm/blob/sycl/xptifw/doc/XPTI_Framework.md[project documentation]
+
+The primary concept enable by this framework is the generation of a
+unique 64-bit ID, referred to as the Universal ID (UID), for every public
+language entry point into the library. This allows tools and other helps in the
+software stack to correlate debug and performance data by tagging it with the
+64-bit UID. The framework also provides the ability to propagate this UID all
+the way to the driver layers for the target device so data from lower layers and
+hardware can be correlated easily.
+
+The XPTI concepts in use here are:
+
+. Tracepoints - define all the points in a software layer we want to
+instrument or trace. The trace point is used to generate the UID.
+. Notification - allows the software layer to communicate the trace
+information to listeners/subscribers
+. Callback - implemented by subscribers to specific events to capture the
+trace information
+
+The SYCL runtime layer defines the tracepoints and notifies the information
+about any given tracepoint to a registered subscriber. These tracepoints are
+enabled in meaningful locations of the runtime to provide semantic information
+about the developer's use of the language. This would include information such
+as relationships that form asynchronous task graphs or other constructs such
+as barriers that are introduced while waiting on events.
+
+== Specification
+
+=== Feature test macro
+
+This extension provides a feature-test macro as described in the core SYCL
+specification.  An implementation supporting this extension must predefine the
+macro `SYCL_EXT_ONEAPI_XPTI_TRACING` to one of the values defined in the table
+below.  Applications can test for the existence of this macro to determine if
+the implementation supports this feature, or applications can test the macro's
+value to determine which of the extension's features the implementation
+supports.
+
+[%header,cols="1,5"]
+|===
+|Value
+|Description
+
+|1
+|The APIs of this experimental extension are not versioned, so the
+ feature-test macro always has this value.
+|===
+
+=== Instrumentation trace points
+Traces belong to a named stream and this constitutes a domain of data. The XPTI
+framework allows the instrumentation logic to define a stream and associate the
+traces to the stream. A stream also defines the protocol to be observed to
+decipher the data at the receiving end. The XPTI API defines the notion of a
+trace point that includes an event, a trace point type and a notification.
+
+* The *event* consists of a payload that describes the event (`source file`,
+  `function name`, `line number` and/or a `code pointer`), a unique ID that
+  is used to identify the event, a global user data field and a mechanism to
+  record metadata associated with the event. The unique ID is generated
+  from the payload, so if the trace point is visited multiple times, it
+  represents the same unique ID and this allows us to determine the number of
+  instances of a trace point.
+
+* The *trace point type* defines the type of notification that is being
+  emitted for the trace point. There are many commonly occurring trace point
+  types that are predefined by the framework, but a stream can extend this
+  set by the extension APIs provided. A subscriber must explicitly register a
+  callback for each trace point type that is of interest to the subscriber. If
+  no subscribers are registered for a stream or a trace point type, then
+  traces will not be emitted. A given trace point event may be used to emit
+  multiple traces to different trace point types.
+
+* The *notification* emits the trace to all subscribers of the stream domain
+  that have a callback registered to the given trace point type. The stream
+  can attached a per-instance user data during this notification call that
+  *must* be guaranteed to be valid for the duration of the notification call.
+
+==== `sycl` stream
+
+This stream describes the topology of the SYCL execution graph.
+
+.`sycl` stream trace points
+|===
+|Trace point type |Parameters descriptions |Available metadata
+
+|`graph_create`
+| * `trace_type`: `xpti::trace_point_type_t::graph_create` that marks the
+    creation of SYCL execution graph.
+  * `parent`: `nullptr`
+  * `event`: the global SYCL execution graph object ID. All other graph related
+    events will always use this ID as the parent ID.
+  * `instance`: a unique ID related to the event, but not a correlation ID as
+    there are other events to correlate to.
+  * `user_data`: `nullptr`
+| None
+
+| `node_create`
+| -
+| -
