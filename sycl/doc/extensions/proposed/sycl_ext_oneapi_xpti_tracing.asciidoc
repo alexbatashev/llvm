@@ -151,14 +151,15 @@ This stream describes the topology of the SYCL execution graph.
 |Trace point type |Parameters descriptions |Available metadata
 
 |`graph_create`
-| * `trace_type`: `xpti::trace_point_type_t::graph_create` that marks the
-    creation of SYCL execution graph.
-  * `parent`: `nullptr`
-  * `event`: the global SYCL execution graph object ID. All other graph related
-    events will always use this ID as the parent ID.
-  * `instance`: a unique ID related to the event, but not a correlation ID as
-    there are other events to correlate to.
-  * `user_data`: `nullptr`
+|
+* `trace_type`: `xpti::trace_point_type_t::graph_create` that marks the
+  creation of SYCL execution graph.
+* `parent`: `nullptr`
+* `event`: the global SYCL execution graph object ID. All other graph related
+  events will always use this ID as the parent ID.
+* `instance`: a unique ID related to the event, but not a correlation ID as
+  there are other events to correlate to.
+* `user_data`: `nullptr`
 | None
 
 | `node_create`
