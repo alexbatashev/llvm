@@ -22,6 +22,7 @@
 #include <detail/global_handler.hpp>
 #include <detail/plugin.hpp>
 #include <detail/xpti_registry.hpp>
+#include <detail/xpti_event_notifier.hpp>
 
 #include <bitset>
 #include <cstdarg>
@@ -452,6 +453,8 @@ static void initializePlugins(std::vector<plugin> &Plugins) {
       std::cerr << "SYCL_PI_TRACE[basic]: "
                 << "Plugin found and successfully loaded: "
                 << PluginNames[I].first << std::endl;
+
+    GlobalHandler::instance().getXPTIEventNotifier().initPIOverrides();
   }
 
 #ifdef XPTI_ENABLE_INSTRUMENTATION

@@ -26,6 +26,7 @@ class plugin;
 class device_filter_list;
 class XPTIRegistry;
 class ThreadPool;
+class XPTIEventNotifier;
 
 using PlatformImplPtr = std::shared_ptr<platform_impl>;
 using ContextImplPtr = std::shared_ptr<context_impl>;
@@ -69,6 +70,7 @@ public:
   XPTIRegistry &getXPTIRegistry();
   std::mutex &getHandlerExtendedMembersMutex();
   ThreadPool &getHostTaskThreadPool();
+  XPTIEventNotifier &getXPTIEventNotifier();
 
   static void registerDefaultContextReleaseHandler();
 
@@ -105,6 +107,7 @@ private:
   InstWithLock<std::mutex> MHandlerExtendedMembersMutex;
   // Thread pool for host task and event callbacks execution
   InstWithLock<ThreadPool> MHostTaskThreadPool;
+  InstWithLock<XPTIEventNotifier> MXPTIEventNotifier;
 };
 } // namespace detail
 } // namespace sycl

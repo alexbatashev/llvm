@@ -6,6 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "detail/xpti_event_notifier.hpp"
 #include <CL/sycl/detail/device_filter.hpp>
 #include <CL/sycl/detail/pi.hpp>
 #include <CL/sycl/detail/spinlock.hpp>
@@ -96,6 +97,10 @@ ThreadPool &GlobalHandler::getHostTaskThreadPool() {
   ThreadPool &TP = getOrCreate(MHostTaskThreadPool, Size);
 
   return TP;
+}
+
+XPTIEventNotifier &GlobalHandler::getXPTIEventNotifier() {
+  return getOrCreate(MXPTIEventNotifier);
 }
 
 void releaseDefaultContexts() {
