@@ -147,3 +147,10 @@ XPTI_CALLBACK_API void waitBeginEndCallback(uint16_t TraceType,
                       TS);
   }
 }
+
+XPTI_CALLBACK_API void eventStatusCallback(uint16_t TraceType,
+                                            xpti::trace_event_data_t *,
+                                            xpti::trace_event_data_t *,
+                                            uint64_t /*Instance*/,
+                                            const void *UserData) {
+}

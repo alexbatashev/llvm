@@ -26,6 +26,7 @@ namespace detail {
 // We define a sycl stream name and this will be used by the instrumentation
 // framework
 inline constexpr const char *SYCL_STREAM_NAME = "sycl";
+inline constexpr const char *SYCL_STREAM_EVENTS_NAME = "sycl.events";
 // Stream name being used for traces generated from the SYCL plugin layer
 inline constexpr const char *SYCL_PICALL_STREAM_NAME = "sycl.pi";
 // Stream name being used for traces generated from PI calls. This stream
@@ -37,6 +38,7 @@ inline constexpr auto SYCL_MEM_ALLOC_STREAM_NAME =
 #ifdef XPTI_ENABLE_INSTRUMENTATION
 extern uint8_t GBufferStreamID;
 extern uint8_t GMemAllocStreamID;
+extern uint8_t GEventsStreamID;
 extern xpti::trace_event_data_t *GMemAllocEvent;
 #endif
 
@@ -53,6 +55,9 @@ public:
       // SYCL buffer events
       GBufferStreamID = xptiRegisterStream(SYCL_BUFFER_STREAM_NAME);
       this->initializeStream(SYCL_BUFFER_STREAM_NAME, 0, 1, "0.1");
+
+      GEventsStreamID = xptiRegisterStream(SYCL_STREAM_EVENTS_NAME);
+      this->initializeStream(SYCL_STREAM_EVENTS_NAME, 0, 1, "0.1");
 
       // Memory allocation events
       GMemAllocStreamID = xptiRegisterStream(SYCL_MEM_ALLOC_STREAM_NAME);

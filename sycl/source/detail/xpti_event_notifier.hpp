@@ -9,8 +9,6 @@
 #pragma once
 
 #include "xpti/xpti_trace_framework.hpp"
-#include "xpti_data_types.h"
-#include "xpti_trace_framework.h"
 #include <CL/sycl/detail/pi.h>
 #include <detail/config.hpp>
 #include <detail/global_handler.hpp>
@@ -38,6 +36,14 @@ public:
       for (plugin &Plugin : Plugins) {
         if (Plugin.getBackend() == backend::opencl) {
           wrapAPIs<backend::opencl>(Plugin);
+        } else if (Plugin.getBackend() == backend::ext_oneapi_level_zero) {
+          wrapAPIs<backend::ext_oneapi_level_zero>(Plugin);
+        } else if (Plugin.getBackend() == backend::ext_oneapi_cuda) {
+          wrapAPIs<backend::ext_oneapi_cuda>(Plugin);
+        } else if (Plugin.getBackend() == backend::ext_oneapi_hip) {
+          wrapAPIs<backend::ext_oneapi_hip>(Plugin);
+        } else if (Plugin.getBackend() == backend::ext_intel_esimd_emulator) {
+          wrapAPIs<backend::ext_intel_esimd_emulator>(Plugin);
         }
       }
 
@@ -72,6 +78,8 @@ public:
 
               MEventProfilingInfo[Info.Backend](Info.Event, PI_PROFILING_INFO_COMMAND_END, sizeof(pi_uint64), &Timestamp, nullptr);
               xpti::addMeaddMetadata(Event, "event_end", Timestamp);
+
+              xptiNotifySubscribers(GEventsStreamID, xpti::trace_signal, nullptr, Event, ID, nullptr);
 
               MEventRelease[Info.Backend](Info.Event);
             }
