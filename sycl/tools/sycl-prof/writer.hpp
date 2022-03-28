@@ -20,6 +20,9 @@ public:
                           size_t PID, size_t TID, size_t TimeStamp) = 0;
   virtual void writeEnd(std::string_view Name, std::string_view Category,
                         size_t PID, size_t TID, size_t TimeStamp) = 0;
+  virtual void writeEvent(std::string_view Name, std::string_view Category,
+                          size_t PID, size_t TID, size_t TimeStart,
+                          size_t TimeEnd) = 0;
   virtual ~Writer() = default;
 };
 
@@ -75,6 +78,23 @@ public:
     MOutFile << "],\n";
     MOutFile << "\"displayTimeUnit\":\"ns\"\n}\n";
     MOutFile.close();
+  }
+
+  void writeEvent(std::string_view Name, std::string_view Category, size_t PID,
+                  size_t TID, size_t TimeStart, size_t TimeEnd) {
+    std::lock_guard _{MWriteMutex};
+
+    if (!MOutFile.is_open())
+      return;
+
+    MOutFile << "{\"name\": \"" << Name << "\", ";
+    MOutFile << "\"cat\": \"" << Category << "\", ";
+    MOutFile << "\"ph\": \"X\", ";
+    MOutFile << "\"pid\": \"" << PID << "\", ";
+    MOutFile << "\"tid\": \"" << TID << "\", ";
+    MOutFile << "\"dur\": \"" << TimeEnd - TimeStart << "\", ";
+    MOutFile << "\"ts\": \"" << TimeStart << "\"},";
+    MOutFile << std::endl;
   }
 
   ~JSONWriter() { finalize(); }

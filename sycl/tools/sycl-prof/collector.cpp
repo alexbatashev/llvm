@@ -8,6 +8,7 @@
 
 #include "writer.hpp"
 #include "xpti/xpti_data_types.h"
+#include "xpti/xpti_trace_framework.hpp"
 
 #include <cstdint>
 #include <cstdlib>
@@ -57,6 +58,11 @@ XPTI_CALLBACK_API void waitBeginEndCallback(uint16_t TraceType,
                                             xpti::trace_event_data_t *,
                                             uint64_t /*Instance*/,
                                             const void *UserData);
+XPTI_CALLBACK_API void eventStatusCallback(uint16_t TraceType,
+                                           xpti::trace_event_data_t *,
+                                           xpti::trace_event_data_t *,
+                                           uint64_t /*Instance*/,
+                                           const void *UserData);
 
 XPTI_CALLBACK_API void xptiTraceInit(unsigned int /*major_version*/,
                                      unsigned int /*minor_version*/,
@@ -89,6 +95,9 @@ XPTI_CALLBACK_API void xptiTraceInit(unsigned int /*major_version*/,
                          waitBeginEndCallback);
     xptiRegisterCallback(StreamID, xpti::trace_barrier_end,
                          waitBeginEndCallback);
+  } else if (std::string_view(StreamName) == "sycl.event") {
+    uint8_t StreamID = xptiRegisterStream(StreamName);
+    xptiRegisterCallback(StreamID, xpti::trace_signal, eventStatusCallback);
   }
 }
 
@@ -149,8 +158,27 @@ XPTI_CALLBACK_API void waitBeginEndCallback(uint16_t TraceType,
 }
 
 XPTI_CALLBACK_API void eventStatusCallback(uint16_t TraceType,
-                                            xpti::trace_event_data_t *,
-                                            xpti::trace_event_data_t *,
-                                            uint64_t /*Instance*/,
-                                            const void *UserData) {
+                                           xpti::trace_event_data_t *,
+                                           xpti::trace_event_data_t *Event,
+                                           uint64_t /*Instance*/,
+                                           const void * /*UserData*/) {
+  xpti::metadata_t *Metadata = xptiQueryMetadata(Event);
+
+  auto [TID, PID, TS] = measure();
+  (void)TS;
+  char *Dummy = nullptr;
+  auto KernelNameKey = xptiRegisterString("kernel_name", &Dummy);
+  auto KernelNameID = *Metadata->find(KernelNameKey);
+  auto [Tmp1, KernelName] = xpti::getMetadata<std::string_view>(KernelNameID);
+  (void)Tmp1;
+  auto EventStartKey = xptiRegisterString("event_start", &Dummy);
+  auto EventStartID = *Metadata->find(EventStartKey);
+  auto [Tmp2, EventStart] = xpti::getMetadata<uint64_t>(EventStartID);
+  (void)Tmp2;
+  auto EventEndKey = xptiRegisterString("event_end", &Dummy);
+  auto EventEndID = *Metadata->find(EventEndKey);
+  auto [Tmp3, EventEnd] = xpti::getMetadata<uint64_t>(EventEndID);
+  (void)Tmp3;
+
+  GWriter->writeEvent(KernelName, "Device", PID, TID, EventStart, EventEnd);
 }
